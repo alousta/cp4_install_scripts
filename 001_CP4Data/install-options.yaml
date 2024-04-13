@@ -1,0 +1,6 @@
+################################################################################
+# watsonx Assistant parameters
+################################################################################
+watson_assistant_size: Starter
+watson_assistant_bigpv: false
+watson_assistant_analytics_enabled: true
