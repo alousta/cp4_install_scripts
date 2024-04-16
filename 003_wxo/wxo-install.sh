@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source wxo.env
+
 ${CPDM_OC_LOGIN}
 cpd-cli manage setup-appconnect \
 --appconnect_ns=${PROJECT_IBM_APP_CONNECT} \
