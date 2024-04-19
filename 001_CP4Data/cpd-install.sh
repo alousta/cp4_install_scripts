@@ -1,11 +1,11 @@
 #!/bin/bash
 source ./cpd.env
-#cp install-config.yaml cpd-cli-workspace/olm-utils-workspace/work/install-config.yaml
 
 # https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=cluster-manually-creating-projects-namespaces-shared-components
-
-#${OC_LOGIN} --token=${OCP_TOKEN}
+#
+#
 #run line 2, 9 and 16 everytime token change
+
 ${OC_LOGIN} 
 oc new-project ${PROJECT_CERT_MANAGER}
 oc new-project ${PROJECT_LICENSE_SERVICE}
@@ -14,6 +14,7 @@ oc new-project ${PROJECT_SCHEDULING_SERVICE}
 # https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=cluster-installing-shared-components
 
 ${CPDM_OC_LOGIN}
+
 cpd-cli manage apply-cluster-components \
 --release=${VERSION} \
 --license_acceptance=true \
@@ -23,7 +24,9 @@ cpd-cli manage apply-scheduler \
 --release=${VERSION} \
 --license_acceptance=true \
 --scheduler_ns=${PROJECT_SCHEDULING_SERVICE}
+
 cp install-config.yaml cpd-cli-workspace/olm-utils-workspace/work/install-config.yaml
+
 # https://access.redhat.com/documentation/id-id/red_hat_openshift_data_foundation/4.9/html/deploying_openshift_data_foundation_using_bare_metal_infrastructure/deploy-standalone-multicloud-object-gateway
 
 OC_VERSION=$(oc version | grep "Server Version" | awk '{print $3}' | awk -F '.' '{ print $1"."$2 }')
@@ -52,6 +55,7 @@ spec:
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
+sleep 30
 ODF_CSV=$(oc get subs/odf-operator -n openshift-storage -o=jsonpath='{.status.installedCSV}')
 oc wait csv/${ODF_CSV} -n openshift-storage --timeout=3600s --for=jsonpath='{.status.phase}'=Succeeded
 cat << EOF | oc apply -f -
@@ -92,7 +96,49 @@ spec:
     dbStorageClassName: ${STG_CLASS_BLOCK}
     reconcileStrategy: standalone
 EOF
+sleep 10
 oc wait pod/noobaa-db-pg-0 --timeout=3600s -n openshift-storage --for=jsonpath='{.status.phase}'=Running
+
+# https://docs.openshift.com/serverless/1.31/install/install-serverless-operator.html
+
+cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-serverless
+EOF
+cat << EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: serverless-operators
+  namespace: openshift-serverless
+spec: {}
+EOF
+cat << EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: serverless-operator
+  namespace: openshift-serverless
+spec:
+  channel: stable 
+  name: serverless-operator 
+  source: redhat-operators 
+  sourceNamespace: openshift-marketplace 
+EOF
+sleep 30
+KN_CSV=$(oc get subs/serverless-operator -n openshift-serverless -o=jsonpath='{.status.installedCSV}')
+oc wait csv/${KN_CSV} -n openshift-serverless --timeout=3600s --for=jsonpath='{.status.phase}'=Succeeded
+cat << EOF | oc apply -f -
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeEventing
+metadata:
+    name: knative-eventing
+    namespace: knative-eventing
+EOF
+sleep 105
+oc get knativeeventing.operator.knative.dev/knative-eventing -n knative-eventing | grep Ready
 
 # https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=software-installing-red-hat-openshift-serverless-knative-eventing
 
@@ -105,50 +151,6 @@ cpd-cli manage setup-instance-topology \
 --cpd_operator_ns=ibm-knative-events \
 --cpd_instance_ns=knative-eventing \
 --license_acceptance=true
-
-# https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=software-installing-app-connect
-
-# ${OC_LOGIN}
-# tar -xf ibm-appconnect-${AC_CASE_VERSION}.tgz
-# oc patch \
-# --filename=ibm-appconnect/inventory/ibmAppconnect/files/op-olm/catalog_source.yaml \
-# --type=merge \
-# -o yaml \
-# --patch="{\"metadata\":{\"namespace\":\"${PROJECT_IBM_APP_CONNECT}\"}}" \
-# --dry-run=client \
-# | oc apply -n ${PROJECT_IBM_APP_CONNECT} -f -
-# cat <<EOF | oc apply -f -
-#   apiVersion: operators.coreos.com/v1
-#   kind: OperatorGroup
-#   metadata:
-#     name: appconnect-og
-#     namespace: ${PROJECT_IBM_APP_CONNECT}
-#   spec:
-#     targetNamespaces:
-#     - ${PROJECT_IBM_APP_CONNECT}
-#     upgradeStrategy: Default
-# EOF
-# cat <<EOF | oc apply -f -
-#   apiVersion: operators.coreos.com/v1alpha1
-#   kind: Subscription
-#   metadata:
-#     name: ibm-appconnect-operator
-#     namespace: ${PROJECT_IBM_APP_CONNECT}
-#   spec:
-#     channel: ${AC_CHANNEL_VERSION}
-#     config:
-#       env:
-#       - name: ACECC_ENABLE_PUBLIC_API
-#         value: "true"
-#     installPlanApproval: Automatic
-#     name: ibm-appconnect
-#     source: appconnect-operator-catalogsource
-#     sourceNamespace: ${PROJECT_IBM_APP_CONNECT}
-# EOF
-# oc wait csv \
-# --namespace="${APROJECT_IBM_APP_CONNECT}" \
-# --lables=operators.coreos.com/ibm-appconnect.${PROJECT_IBM_APP_CONNECT}='' \
-# --for='jsonpath={.status.phase}'=Succeeded
 
 # https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=data-manually-creating-projects-namespaces
 

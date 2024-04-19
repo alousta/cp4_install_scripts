@@ -25,6 +25,7 @@ spec:
     registryPoll:
       interval: 45m
 EOF
+sleep 5
 oc wait CatalogSource/ibm-operator-catalog -n openshift-marketplace --timeout=600s --for=jsonpath='{.status.connectionState.lastObservedState}'=READY
 
 
@@ -90,10 +91,15 @@ metadata:
   namespace: ${NS}
 spec:
   channel: ${ACE_OPERATOR_CHANNEL}
+  config:
+    env:
+    - name: ACECC_ENABLE_PUBLIC_API
+      value: "true"
   name: ${ACE_OPERATOR_PACKAGE_NAME}
   source: ibm-operator-catalog
   sourceNamespace: openshift-marketplace
 EOF
+sleep 300
 oc wait commonservice/common-service -n ${NS} --timeout=600s --for=jsonpath='{.status.phase}'=Succeeded
 oc wait clusterserviceversion/${PN_OPERATOR_PACKAGE_NAME}.v${PN_OPERATOR_VERSION} -n ${NS} --timeout=600s --for=jsonpath='{.status.phase}'=Succeeded
 oc wait clusterserviceversion/${APIC_OPERATOR_PACKAGE_NAME}.v${APIC_OPERATOR_VERSION} -n ${NS} --timeout=600s --for=jsonpath='{.status.phase}'=Succeeded
@@ -116,7 +122,7 @@ spec:
   replicas: 1
   version: 2023.4.1
 EOF
-
+sleep 10
 oc wait platformnavigator/integration -n ${NS} --timeout=3600s  --for=jsonpath='{.status.metadata.coreNamespace}'=${NS}
 
 # Deploy APIC
@@ -140,5 +146,5 @@ spec:
   version: 10.0.7.0
   storageClassName: ${STG_CLASS}
 EOF
-
+sleep 10
 oc wait apiconnectcluster/api-management -n ${NS} --timeout=1800s --for=jsonpath='{.status.phase}'=Ready
