@@ -138,6 +138,22 @@ metadata:
     namespace: knative-eventing
 EOF
 sleep 105
+  count=0
+  STATKN=$(oc get knativeeventing.operator.knative.dev/knative-eventing -n knative-eventing | grep Ready | wc -l)
+  while [[ ${STATKN} -lt 1 ]] do
+    if [[ ${count} -eq 50 ]]; then
+      echo "Timed out waiting for knativeeventing"
+      exit 1
+    else
+      count=$((count + 1))
+    fi
+
+    echo "${count} Waiting for knativeeventing to start"
+    sleep 60
+    STATKN=$(oc get knativeeventing.operator.knative.dev/knative-eventing -n knative-eventing | grep Ready | wc -l)
+  done
+
+
 oc get knativeeventing.operator.knative.dev/knative-eventing -n knative-eventing | grep Ready
 
 # https://www.ibm.com/docs/en/cloud-paks/cp-data/4.8.x?topic=software-installing-red-hat-openshift-serverless-knative-eventing
